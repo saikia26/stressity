@@ -1,0 +1,200 @@
+{
+  "testStream": {
+    "StreamName": "test_stream",
+    "Enabled": true,
+    "BatchSize": 10,
+    "BatchIntervalInMS": 100,
+    "RunDurationInSec": 30,
+    "TotalCount": 20,
+    "Schema": {
+      "objectKey": {
+        "type": "object",
+        "objectMap": {
+          "key1": {
+            "type": "string",
+            "meta": {
+              "prefix": "abc",
+              "suffix": "xyz",
+              "base": "random:10"
+            }
+          },
+          "key2": {
+            "type": "string",
+            "meta": {
+              "prefix": "abc",
+              "suffix": "xyz",
+              "base": "uuid"
+            }
+          },
+          "key3": {
+            "type": "string",
+            "meta": {
+              "prefix": "abc",
+              "suffix": "xyz",
+              "base": "someString"
+            }
+          },
+          "key4": {
+            "type": "number",
+            "meta": {
+              "min": 100,
+              "max": 10000
+            }
+          },
+          "key5": {
+            "type": "integer",
+            "meta": {
+              "min": 100,
+              "max": 10000
+            }
+          },
+          "key6": {
+            "type": "time",
+            "meta": {}
+          }
+        }
+      },
+      "key1": {
+        "type": "string",
+        "meta": {
+          "prefix": "abc",
+          "suffix": "xyz",
+          "base": "random:10"
+        }
+      },
+      "key2": {
+        "type": "string",
+        "meta": {
+          "prefix": "abc",
+          "suffix": "xyz",
+          "base": "uuid"
+        }
+      },
+      "key3": {
+        "type": "string",
+        "meta": {
+          "prefix": "abc",
+          "suffix": "xyz",
+          "base": "someString"
+        }
+      },
+      "key4": {
+        "type": "number",
+        "meta": {
+          "min": 100,
+          "max": 10000
+        }
+      },
+      "key5": {
+        "type": "integer",
+        "meta": {
+          "min": 100,
+          "max": 10000
+        }
+      },
+      "key6": {
+        "type": "time",
+        "meta": {}
+      }
+    }
+  },
+  "testStream2": {
+    "StreamName": "test_stream",
+    "Enabled": true,
+    "BatchSize": 10,
+    "BatchIntervalInMS": 1000,
+    "RunDurationInSec": 30,
+    "TotalCount": 100,
+    "Schema": {
+      "objectKey": {
+        "type": "object",
+        "objectMap": {
+          "key1": {
+            "type": "string",
+            "meta": {
+              "prefix": "abc",
+              "suffix": "xyz",
+              "base": "random:10"
+            }
+          },
+          "key2": {
+            "type": "string",
+            "meta": {
+              "prefix": "abc",
+              "suffix": "xyz",
+              "base": "uuid"
+            }
+          },
+          "key3": {
+            "type": "string",
+            "meta": {
+              "prefix": "abc",
+              "suffix": "xyz",
+              "base": "someString"
+            }
+          },
+          "key4": {
+            "type": "number",
+            "meta": {
+              "min": 100,
+              "max": 10000
+            }
+          },
+          "key5": {
+            "type": "integer",
+            "meta": {
+              "min": 100,
+              "max": 10000
+            }
+          },
+          "key6": {
+            "type": "time",
+            "meta": {}
+          }
+        }
+      },
+      "key1": {
+        "type": "string",
+        "meta": {
+          "prefix": "abc",
+          "suffix": "xyz",
+          "base": "random:10"
+        }
+      },
+      "key2": {
+        "type": "string",
+        "meta": {
+          "prefix": "abc",
+          "suffix": "xyz",
+          "base": "uuid"
+        }
+      },
+      "key3": {
+        "type": "string",
+        "meta": {
+          "prefix": "abc",
+          "suffix": "xyz",
+          "base": "someString"
+        }
+      },
+      "key4": {
+        "type": "number",
+        "meta": {
+          "min": 100,
+          "max": 10000
+        }
+      },
+      "key5": {
+        "type": "integer",
+        "meta": {
+          "min": 100,
+          "max": 10000
+        }
+      },
+      "key6": {
+        "type": "time",
+        "meta": {}
+      }
+    }
+  }
+}

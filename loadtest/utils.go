@@ -17,16 +17,13 @@ func DecodeFile(filePath string, destination interface{}) error {
 	return decoder.Decode(destination)
 }
 
-func ValidatePreRequisites(schemas map[string]StreamSchema) error {
+func ValidatePreRequisites(schemas map[string]Schema) error {
 	schemasToRun := 0
 	for identifier, schemaConf := range schemas {
 		if !schemaConf.Enabled {
 			continue
 		}
-		if kafkaConf := AppConfig.KafkaConfigs[schemaConf.StreamName]; !kafkaConf.Enabled {
-			return fmt.Errorf("kafka conf is either not present or disabled for schema %s and stream name %s", identifier, schemaConf.StreamName)
-		}
-		err := validateSchema(identifier, schemaConf.Schema)
+		err := validateConfigsForSchema(identifier, schemaConf)
 		if err != nil {
 			return err
 		}
@@ -35,6 +32,32 @@ func ValidatePreRequisites(schemas map[string]StreamSchema) error {
 	if schemasToRun == 0 {
 		return errors.New("no schemas present")
 	}
+	return nil
+}
+
+func validateConfigsForSchema(schemaName string, schemaConf Schema) error {
+	_, ok := AppConfig.KafkaConfigs[schemaName]
+	if schemaConf.TestStream {
+		if !ok {
+			return fmt.Errorf("kafka config is either not present for %s", schemaName)
+		}
+		err := validateSchema(schemaName, schemaConf.StreamSchema)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, ok = AppConfig.KafkaConfigs[schemaName]
+	if schemaConf.TestAPI {
+		if !ok {
+			return fmt.Errorf("kafka config is either not present for %s", schemaName)
+		}
+		err := validateSchema(schemaName, schemaConf.APISchema)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

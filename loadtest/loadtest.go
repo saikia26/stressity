@@ -3,9 +3,10 @@ package loadtest
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Shopify/sarama"
 	"sync"
 	"time"
+
+	"github.com/Shopify/sarama"
 )
 
 const (
@@ -16,36 +17,37 @@ const (
 	keyObjectMap = "objectMap"
 )
 
-type StreamSchema struct {
-	StreamName        string
+type Schema struct {
 	Enabled           bool
 	BatchSize         int
 	BatchIntervalInMS int64
 	RunDurationInSec  int64
 	TotalCount        int
-	Schema            map[string]interface{}
+	TestAPI           bool
+	TestStream        bool
+	APISchema         map[string]interface{}
+	StreamSchema      map[string]interface{}
 }
 
 var (
 	AppConfig Conf
-	Schemas   map[string]StreamSchema
+	Schemas   map[string]Schema
 )
 
 func StartLoadTest() {
 	wg := &sync.WaitGroup{}
-	for schemaName, schemaConf := range Schemas {
+	for identifier, schemaConf := range Schemas {
 		if !schemaConf.Enabled {
 			continue
 		}
 		wg.Add(1)
-		go loadTestSchema(schemaName, schemaConf, wg)
+		go loadTest(identifier, schemaConf, wg)
 	}
-
 	wg.Wait()
 	fmt.Printf("\n\nDone!\n\n")
 }
 
-func loadTestSchema(schemaName string, schemaConf StreamSchema, wg *sync.WaitGroup) {
+func loadTest(schemaName string, schemaConf Schema, wg *sync.WaitGroup) {
 	startTime := time.Now()
 	currCount := 0
 	batchCount := 0
@@ -63,13 +65,10 @@ func loadTestSchema(schemaName string, schemaConf StreamSchema, wg *sync.WaitGro
 		batchCount++
 		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", schemaName, batchCount, currCount)
 		nextBatchSize := getNextBatchSize(currCount, maxCount, batchSize)
-		producerMsgs := getNextDataBatch(nextBatchSize, schemaName, schemaConf.Schema, AppConfig.KafkaConfigs[schemaConf.StreamName].Topic)
-		err := publish(schemaConf.StreamName, producerMsgs)
-		if err != nil {
-			fmt.Printf("\nError while publishing batch %d of %s, err: %v, retying...", batchCount, schemaName, err)
-		} else {
-			currCount += len(producerMsgs)
-		}
+		apiMsgs, streamMsgs := getNextDataBatch(nextBatchSize, schemaName, schemaConf)
+		call(schemaName, apiMsgs)
+		publish(schemaName, streamMsgs)
+		currCount += len(streamMsgs)
 		time.Sleep(sleepDuration)
 	}
 }
@@ -82,21 +81,31 @@ func getNextBatchSize(countDone, maxCount, batchSize int) int {
 	return currBatchSize
 }
 
-func getNextDataBatch(batchSize int, schemaName string, schema map[string]interface{}, topic string) []*sarama.ProducerMessage {
-	msgsToPublish := make([]*sarama.ProducerMessage, 0, batchSize)
+func getNextDataBatch(batchSize int, schemaName string, schemaConf Schema) ([][]byte, []*sarama.ProducerMessage) {
+	apiMsgs := make([][]byte, 0, batchSize)
+	streamMsgs := make([]*sarama.ProducerMessage, 0, batchSize)
+	topic := AppConfig.KafkaConfigs[schemaName].Topic
+
 	for count := 0; count < batchSize; count++ {
-		data := getDataFromSchema(schema)
-		msg, err := json.Marshal(data)
+		apiData := getDataFromSchema(schemaConf.APISchema)
+		apiMsg, err := json.Marshal(apiData)
 		if err != nil {
 			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
 			continue
 		}
-		msgsToPublish = append(msgsToPublish, &sarama.ProducerMessage{
+		streamData := getDataFromSchema(schemaConf.StreamSchema)
+		streamMsg, err := json.Marshal(streamData)
+		if err != nil {
+			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
+			continue
+		}
+		streamMsgs = append(streamMsgs, &sarama.ProducerMessage{
 			Topic: topic,
-			Value: sarama.StringEncoder(msg),
+			Value: sarama.StringEncoder(streamMsg),
 		})
+		apiMsgs = append(apiMsgs, apiMsg)
 	}
-	return msgsToPublish
+	return apiMsgs, streamMsgs
 }
 
 func getDataFromSchema(schema map[string]interface{}) map[string]interface{} {

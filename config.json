@@ -1,9 +1,16 @@
 {
   "KafkaConfigs": {
-    "test_stream": {
+    "test": {
       "Topic": "test_stream",
       "Brokers": ["localhost:9092"],
       "ClientID": "test",
+      "Enabled": true
+    }
+  },
+  "APIConfigs": {
+    "test": {
+      "URL": "",
+      "Method": "",
       "Enabled": true
     }
   }

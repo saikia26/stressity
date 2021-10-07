@@ -27,6 +27,7 @@ type Schema struct {
 	TestStream        bool
 	APISchema         map[string]interface{}
 	StreamSchema      map[string]interface{}
+	KeyMeta           map[string]interface{}
 }
 
 var (
@@ -66,8 +67,12 @@ func loadTest(schemaName string, schemaConf Schema, wg *sync.WaitGroup) {
 		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", schemaName, batchCount, currCount)
 		nextBatchSize := getNextBatchSize(currCount, maxCount, batchSize)
 		apiMsgs, streamMsgs := getNextDataBatch(nextBatchSize, schemaName, schemaConf)
-		call(schemaName, apiMsgs)
-		publish(schemaName, streamMsgs)
+		if schemaConf.TestAPI {
+			callForABatch(schemaName, apiMsgs)
+		}
+		if schemaConf.TestStream {
+			publishForABatch(schemaName, streamMsgs)
+		}
 		currCount += len(streamMsgs)
 		time.Sleep(sleepDuration)
 	}
@@ -87,13 +92,14 @@ func getNextDataBatch(batchSize int, schemaName string, schemaConf Schema) ([][]
 	topic := AppConfig.KafkaConfigs[schemaName].Topic
 
 	for count := 0; count < batchSize; count++ {
-		apiData := getDataFromSchema(schemaConf.APISchema)
+		sampleData := generateDataFromKeyMeta(schemaConf.KeyMeta)
+		apiData := getDataFromSchema(schemaConf.APISchema, sampleData)
 		apiMsg, err := json.Marshal(apiData)
 		if err != nil {
 			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
 			continue
 		}
-		streamData := getDataFromSchema(schemaConf.StreamSchema)
+		streamData := getDataFromSchema(schemaConf.StreamSchema, sampleData)
 		streamMsg, err := json.Marshal(streamData)
 		if err != nil {
 			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
@@ -108,19 +114,28 @@ func getNextDataBatch(batchSize int, schemaName string, schemaConf Schema) ([][]
 	return apiMsgs, streamMsgs
 }
 
-func getDataFromSchema(schema map[string]interface{}) map[string]interface{} {
+func generateDataFromKeyMeta(keysInfo map[string]interface{}) map[string]interface{} {
 	res := make(map[string]interface{})
-	for key, valObj := range schema {
+	for key, valObj := range keysInfo {
 		valMap, _ := valObj.(map[string]interface{})
 		if rawVal, ok := valMap[keyRawVal]; ok {
 			res[key] = rawVal
 			continue
 		}
-		if valMap[keyType] == keyObject {
-			res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}))
+		res[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+	}
+	return res
+}
+
+func getDataFromSchema(schema map[string]interface{}, sampleData map[string]interface{}) map[string]interface{} {
+	res := make(map[string]interface{})
+	for key, valObj := range schema {
+		valMap, _ := valObj.(map[string]interface{})
+		if typ, ok := valMap[keyType]; ok && typ == keyObject {
+			res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}), sampleData)
 			continue
 		}
-		res[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+		res[key] = sampleData[key]
 	}
 	return res
 }

@@ -41,7 +41,7 @@ func validateConfigsForSchema(schemaName string, schemaConf Schema) error {
 		if !ok {
 			return fmt.Errorf("kafka config is either not present for %s", schemaName)
 		}
-		err := validateSchema(schemaName, schemaConf.StreamSchema)
+		err := validateSchema(schemaName, schemaConf.StreamSchema, schemaConf.KeyMeta)
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func validateConfigsForSchema(schemaName string, schemaConf Schema) error {
 		if !ok {
 			return fmt.Errorf("kafka config is either not present for %s", schemaName)
 		}
-		err := validateSchema(schemaName, schemaConf.APISchema)
+		err := validateSchema(schemaName, schemaConf.APISchema, schemaConf.KeyMeta)
 		if err != nil {
 			return err
 		}
@@ -61,31 +61,40 @@ func validateConfigsForSchema(schemaName string, schemaConf Schema) error {
 	return nil
 }
 
-func validateSchema(schemaName string, schema map[string]interface{}) error {
+func validateSchema(schemaName string, schema map[string]interface{}, metaObj map[string]interface{}) error {
 	for key, valObj := range schema {
 		valMap, ok := valObj.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("non-map value found for key %s in schema %s", key, schemaName)
 		}
-		if _, ok := valMap[keyRawVal]; ok {
-			continue
-		}
-		typ, ok := valMap[keyType].(string)
-		if !ok {
-			return fmt.Errorf("type not present for key %s in schema %s", key, schemaName)
-		}
-		if typ == keyObject {
-			objectMap, ok := valMap[keyObjectMap].(map[string]interface{})
+
+		typ, ok := valMap[keyType]
+		if ok && typ.(string) == keyObject {
+			objectMap, ok := valMap[keyObjectMap]
+			if !ok {
+				return fmt.Errorf("no object map found for object type key %s in schema %s", key, schemaName)
+			}
+
+			objectMapVal, ok := objectMap.(map[string]interface{})
 			if !ok {
 				return fmt.Errorf("non-map object found for object type key %s in schema %s", key, schemaName)
 			}
-			err := validateSchema(schemaName, objectMap)
+
+			err := validateSchema(schemaName, objectMapVal, metaObj)
 			if err != nil {
 				return err
 			}
 			continue
 		}
-		if _, ok := valueFinders[typ]; !ok {
+
+		meta, ok := metaObj[key].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("meta not found for key %s in schema %s", key, schemaName)
+		}
+		if _, ok := meta[keyRawVal]; ok {
+			continue
+		}
+		if _, ok := valueFinders[typ.(string)]; !ok {
 			return fmt.Errorf("typ %s not supported (key %s in schema %s)", typ, key, schemaName)
 		}
 		if typ == "uuid" || typ == "time" {

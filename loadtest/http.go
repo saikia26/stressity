@@ -6,10 +6,16 @@ import (
 	"time"
 )
 
+const (
+	contentType     = "Content-Type"
+	applicationJSON = "application/json"
+)
+
 type APIClient struct {
-	Client *http.Client
-	Method string
-	URL    string
+	Client  *http.Client
+	Method  string
+	URL     string
+	Headers map[string]string
 }
 
 var (
@@ -50,17 +56,26 @@ func createAPIClients(config APIConfig) APIClient {
 		},
 		Method: config.Method,
 		URL:    config.URL,
+		Headers: map[string]string{
+			contentType: applicationJSON,
+		},
 	}
 }
 
-func call(apiName string, msgs [][]byte) (errs []error) {
+func callForABatch(apiName string, msgs [][]byte) (errs []error) {
 	apiClient, _ := apiClients[apiName]
+	headers := http.Header{}
+	for key, value := range apiClient.Headers {
+		headers.Set(key, value)
+	}
+
 	for _, msg := range msgs {
 		request, err := http.NewRequest(apiClient.Method, apiClient.URL, bytes.NewBuffer(msg))
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
+		request.Header = headers
 		_, err = apiClient.Client.Do(request)
 		if err != nil {
 			errs = append(errs, err)

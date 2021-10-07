@@ -15,6 +15,9 @@ const (
 	keyMeta      = "meta"
 	keyObject    = "object"
 	keyObjectMap = "objectMap"
+
+	APISchemaType    = "apiSchemaType"
+	StreamSchemaType = "streamSchemaType"
 )
 
 type Schema struct {
@@ -66,14 +69,16 @@ func loadTest(schemaName string, schemaConf Schema, wg *sync.WaitGroup) {
 		batchCount++
 		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", schemaName, batchCount, currCount)
 		nextBatchSize := getNextBatchSize(currCount, maxCount, batchSize)
-		apiMsgs, streamMsgs := getNextDataBatch(nextBatchSize, schemaName, schemaConf)
+		sampleData := generateDataFromKeyMeta(schemaConf.KeyMeta, nextBatchSize)
 		if schemaConf.TestAPI {
-			callForABatch(schemaName, apiMsgs)
+			msgs := getNextDataBatchForAPI(schemaName, schemaConf.APISchema, sampleData)
+			callForABatch(schemaName, msgs)
 		}
 		if schemaConf.TestStream {
-			publishForABatch(schemaName, streamMsgs)
+			msgs := getNextDataBatchForStream(schemaName, schemaConf.APISchema, sampleData)
+			publishForABatch(schemaName, msgs)
 		}
-		currCount += len(streamMsgs)
+		currCount += nextBatchSize
 		time.Sleep(sleepDuration)
 	}
 }
@@ -86,20 +91,12 @@ func getNextBatchSize(countDone, maxCount, batchSize int) int {
 	return currBatchSize
 }
 
-func getNextDataBatch(batchSize int, schemaName string, schemaConf Schema) ([][]byte, []*sarama.ProducerMessage) {
-	apiMsgs := make([][]byte, 0, batchSize)
-	streamMsgs := make([]*sarama.ProducerMessage, 0, batchSize)
+func getNextDataBatchForStream(schemaName string, schema map[string]interface{}, sampleData []map[string]interface{}) []*sarama.ProducerMessage {
+	streamMsgs := make([]*sarama.ProducerMessage, 0, len(sampleData))
 	topic := AppConfig.KafkaConfigs[schemaName].Topic
 
-	for count := 0; count < batchSize; count++ {
-		sampleData := generateDataFromKeyMeta(schemaConf.KeyMeta)
-		apiData := getDataFromSchema(schemaConf.APISchema, sampleData)
-		apiMsg, err := json.Marshal(apiData)
-		if err != nil {
-			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
-			continue
-		}
-		streamData := getDataFromSchema(schemaConf.StreamSchema, sampleData)
+	for count := 0; count < len(sampleData); count++ {
+		streamData := getDataFromSchema(schema, sampleData[count])
 		streamMsg, err := json.Marshal(streamData)
 		if err != nil {
 			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
@@ -109,20 +106,37 @@ func getNextDataBatch(batchSize int, schemaName string, schemaConf Schema) ([][]
 			Topic: topic,
 			Value: sarama.StringEncoder(streamMsg),
 		})
-		apiMsgs = append(apiMsgs, apiMsg)
 	}
-	return apiMsgs, streamMsgs
+	return streamMsgs
 }
 
-func generateDataFromKeyMeta(keysInfo map[string]interface{}) map[string]interface{} {
-	res := make(map[string]interface{})
-	for key, valObj := range keysInfo {
-		valMap, _ := valObj.(map[string]interface{})
-		if rawVal, ok := valMap[keyRawVal]; ok {
-			res[key] = rawVal
+func getNextDataBatchForAPI(schemaName string, schema map[string]interface{}, sampleData []map[string]interface{}) [][]byte {
+	apiMsgs := make([][]byte, 0, len(sampleData))
+	for count := 0; count < len(sampleData); count++ {
+		apiData := getDataFromSchema(schema, sampleData[count])
+		apiMsg, err := json.Marshal(apiData)
+		if err != nil {
+			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
 			continue
 		}
-		res[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+		apiMsgs = append(apiMsgs, apiMsg)
+	}
+	return apiMsgs
+}
+
+func generateDataFromKeyMeta(keysInfo map[string]interface{}, batchSize int) []map[string]interface{} {
+	res := make([]map[string]interface{}, 0, batchSize)
+	for count := 0; count < batchSize; count++ {
+		sampleData := make(map[string]interface{})
+		for key, valObj := range keysInfo {
+			valMap, _ := valObj.(map[string]interface{})
+			if rawVal, ok := valMap[keyRawVal]; ok {
+				sampleData[key] = rawVal
+				continue
+			}
+			sampleData[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+		}
+		res = append(res, sampleData)
 	}
 	return res
 }

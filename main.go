@@ -4,7 +4,7 @@ import "github.com/stressity/loadtest"
 
 const (
 	configFilePath = "config.json"
-	schemaFilePath = "stream_schemas.json"
+	schemaFilePath = "schemas.json"
 )
 
 func main() {

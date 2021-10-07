@@ -68,8 +68,8 @@ func validateSchema(schemaName string, schema map[string]interface{}, metaObj ma
 			return fmt.Errorf("non-map value found for key %s in schema %s", key, schemaName)
 		}
 
-		typ, ok := valMap[keyType]
-		if ok && typ.(string) == keyObject {
+		objectTyp, ok := valMap[keyType]
+		if ok && objectTyp.(string) == keyObject {
 			objectMap, ok := valMap[keyObjectMap]
 			if !ok {
 				return fmt.Errorf("no object map found for object type key %s in schema %s", key, schemaName)
@@ -87,20 +87,28 @@ func validateSchema(schemaName string, schema map[string]interface{}, metaObj ma
 			continue
 		}
 
-		meta, ok := metaObj[key].(map[string]interface{})
+		metaMap, ok := metaObj[key].(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("meta not found for key %s in schema %s", key, schemaName)
 		}
-		if _, ok := meta[keyRawVal]; ok {
+		if _, ok := metaMap[keyRawVal]; ok {
 			continue
 		}
-		if _, ok := valueFinders[typ.(string)]; !ok {
-			return fmt.Errorf("typ %s not supported (key %s in schema %s)", typ, key, schemaName)
+		keyTyp, ok := metaMap[keyType]
+		if !ok {
+			return fmt.Errorf("type not found for key %s in key meta for schema %s", key, schemaName)
 		}
-		if typ == "uuid" || typ == "time" {
+		if _, ok := valueFinders[keyTyp.(string)]; !ok {
+			return fmt.Errorf("typ %s not supported (key %s in schema %s)", objectTyp, key, schemaName)
+		}
+		if keyTyp.(string) == "uuid" || keyTyp.(string) == "time" {
 			continue
 		}
-		if _, ok := valMap[keyMeta].(map[string]interface{}); !ok {
+		meta, ok := metaMap[keyMeta]
+		if !ok {
+			return fmt.Errorf("meta not found for key %s in key meta for schema %s", key, schemaName)
+		}
+		if _, ok := meta.(map[string]interface{}); !ok {
 			return fmt.Errorf("meta not a map for key %s in schema %s", key, schemaName)
 		}
 	}

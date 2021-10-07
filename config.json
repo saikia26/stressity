@@ -4,13 +4,13 @@
       "Topic": "test_stream",
       "Brokers": ["localhost:9092"],
       "ClientID": "test",
-      "Enabled": true
+      "Enabled": false
     }
   },
   "APIConfigs": {
     "test": {
-      "URL": "",
-      "Method": "",
+      "URL": "localhost:8080/risk/api/v2/validate/partnertxn",
+      "Method": "POST",
       "Enabled": true
     }
   }

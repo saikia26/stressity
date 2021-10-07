@@ -1,2 +1,2 @@
 # stressity
-Stress test on a stream (currently only kafka is supported). This functionality will be extended to more uses cases including APIs, in the future.
+Stressity is a load testing framework which provides functionality to load test APIs and streams (currently only kafka is supported) by generating dummy data.

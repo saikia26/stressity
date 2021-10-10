@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	keyType      = "type"
-	keyRawVal    = "rawVal"
-	keyMeta      = "meta"
-	keyObject    = "object"
-	keyObjectMap = "objectMap"
-
-	APISchemaType    = "apiSchemaType"
-	StreamSchemaType = "streamSchemaType"
+	keyType        = "type"
+	keyLen         = "len"
+	keyRawVal      = "rawVal"
+	keyMeta        = "meta"
+	keyObject      = "object"
+	keyArray       = "array"
+	keyObjectMap   = "objectMap"
+	keyArrayValues = "arrayValues"
 )
 
 type Schema struct {
@@ -145,9 +145,23 @@ func getDataFromSchema(schema map[string]interface{}, sampleData map[string]inte
 	res := make(map[string]interface{})
 	for key, valObj := range schema {
 		valMap, _ := valObj.(map[string]interface{})
-		if typ, ok := valMap[keyType]; ok && typ == keyObject {
-			res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}), sampleData)
-			continue
+		typ, ok := valMap[keyType]
+		if ok {
+			if typ == keyObject {
+				res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}), sampleData)
+				continue
+			}
+			if typ == keyArray {
+				// hacky way to convert float to int
+				arrLen := valMap[keyLen].(float64)
+				arr := make([]interface{}, 0, int(arrLen))
+				arrSchema := valMap[keyArrayValues].(map[string]interface{})
+				for i := 0; i < int(arrLen); i++ {
+					arr = append(arr, getDataFromSchema(arrSchema[keyObjectMap].(map[string]interface{}), sampleData))
+				}
+				res[key] = arr
+				continue
+			}
 		}
 		res[key] = sampleData[key]
 	}

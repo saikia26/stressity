@@ -47,10 +47,10 @@ func validateConfigsForSchema(schemaName string, schemaConf Schema) error {
 		}
 	}
 
-	_, ok = AppConfig.KafkaConfigs[schemaName]
+	_, ok = AppConfig.APIConfigs[schemaName]
 	if schemaConf.TestAPI {
 		if !ok {
-			return fmt.Errorf("kafka config is either not present for %s", schemaName)
+			return fmt.Errorf("api config is either not present for %s", schemaName)
 		}
 		err := validateSchema(schemaName, schemaConf.APISchema, schemaConf.KeyMeta)
 		if err != nil {
@@ -69,22 +69,22 @@ func validateSchema(schemaName string, schema map[string]interface{}, metaObj ma
 		}
 
 		objectTyp, ok := valMap[keyType]
-		if ok && objectTyp.(string) == keyObject {
-			objectMap, ok := valMap[keyObjectMap]
-			if !ok {
-				return fmt.Errorf("no object map found for object type key %s in schema %s", key, schemaName)
+		if ok {
+			if objectTyp.(string) == keyObject {
+				err := validateObjectMap(valMap, schemaName, metaObj, key)
+				if err != nil {
+					return err
+				}
+				continue
 			}
 
-			objectMapVal, ok := objectMap.(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("non-map object found for object type key %s in schema %s", key, schemaName)
+			if objectTyp.(string) == keyArray {
+				err := validateArray(valMap, schemaName, metaObj, key)
+				if err != nil {
+					return err
+				}
+				continue
 			}
-
-			err := validateSchema(schemaName, objectMapVal, metaObj)
-			if err != nil {
-				return err
-			}
-			continue
 		}
 
 		metaMap, ok := metaObj[key].(map[string]interface{})
@@ -113,6 +113,38 @@ func validateSchema(schemaName string, schema map[string]interface{}, metaObj ma
 		}
 	}
 	return nil
+}
+
+// validateArray currently supports and validates an array of key value pairs only.
+func validateArray(valMap map[string]interface{}, schemaName string, metaObj map[string]interface{}, key string) error {
+	arr, ok := valMap[keyArrayValues]
+	if !ok {
+		return fmt.Errorf("no array schema found for key %s in schema %s", key, schemaName)
+	}
+	_, ok = valMap[keyLen]
+	if !ok {
+		return fmt.Errorf("array length not specified for key %s in schema %s", key, schemaName)
+	}
+	arrVals, ok := arr.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("non-map object found for key %s in schema %s", key, schemaName)
+	}
+
+	return validateObjectMap(arrVals, schemaName, metaObj, key)
+}
+
+func validateObjectMap(valMap map[string]interface{}, schemaName string, metaObj map[string]interface{}, key string) error {
+	objectMap, ok := valMap[keyObjectMap]
+	if !ok {
+		return fmt.Errorf("no object map found for key %s in schema %s", key, schemaName)
+	}
+
+	objectMapVal, ok := objectMap.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("non-map object found for object type key %s in schema %s", key, schemaName)
+	}
+
+	return validateSchema(schemaName, objectMapVal, metaObj)
 }
 
 func getRandomString(n int) string {

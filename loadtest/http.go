@@ -1,9 +1,11 @@
 package loadtest
 
 import (
-	"bytes"
-	"net/http"
+	"net/url"
+	"sync"
 	"time"
+
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -11,15 +13,17 @@ const (
 	applicationJSON = "application/json"
 )
 
-type APIClient struct {
-	Client  *http.Client
-	Method  string
-	URL     string
-	Headers map[string]string
+type apiClient struct {
+	Clients        []fasthttp.PipelineClient
+	Method         string
+	Timeout        time.Duration
+	Headers        map[string]string
+	PipelineFactor int
+	URL            string
 }
 
 var (
-	apiClients = make(map[string]APIClient)
+	apiClients = make(map[string]apiClient)
 )
 
 func InitHTTPClients() {
@@ -32,55 +36,70 @@ func InitHTTPClients() {
 	}
 }
 
-func createAPIClients(config APIConfig) APIClient {
-	// Maximum Idle connections across all hosts
-	maxIdleCon := config.MaxIdleConnections
-	if maxIdleCon == 0 {
-		maxIdleCon = 100
+func createAPIClients(config APIConfig) apiClient {
+	var clients []fasthttp.PipelineClient
+	u, _ := url.Parse(config.URL)
+	client := fasthttp.PipelineClient{
+		Addr:               u.Host,
+		IsTLS:              u.Scheme == "https",
+		MaxPendingRequests: config.PipelineFactor,
 	}
-	maxIdleConPerHost := config.MaxIdleConnectionsPerHost
-	if maxIdleConPerHost == 0 {
-		maxIdleConPerHost = 30
+
+	for i := 0; i < config.NumClients; i++ {
+		clients = append(clients, client)
 	}
-	timeoutInMs := config.RequestTimeOut
-	if timeoutInMs == 0 {
-		timeoutInMs = 2000
+	headers := map[string]string{
+		contentType: applicationJSON,
 	}
-	return APIClient{
-		Client: &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns:        maxIdleCon,
-				MaxIdleConnsPerHost: maxIdleConPerHost,
-			},
-			Timeout: time.Duration(timeoutInMs) * time.Millisecond,
-		},
-		Method: config.Method,
-		URL:    config.URL,
-		Headers: map[string]string{
-			contentType: applicationJSON,
-		},
+	return apiClient{
+		Clients:        clients,
+		Method:         config.Method,
+		Timeout:        time.Duration(config.TimeoutInMS) * time.Millisecond,
+		Headers:        headers,
+		PipelineFactor: config.PipelineFactor,
+		URL:            config.URL,
 	}
 }
 
-func callForABatch(apiName string, msgs [][]byte) (errs []error) {
+func callForABatch(apiName string, msgs [][]byte) {
 	apiClient, _ := apiClients[apiName]
-	headers := http.Header{}
-	for key, value := range apiClient.Headers {
-		headers.Set(key, value)
+	msgQueue := make(chan []byte, 50)
+	respChan := make(chan bool, len(msgs))
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		for _, msg := range msgs {
+			msgQueue <- msg
+		}
+	}()
+
+	go func() {
+		for i := 0; i < len(msgs); i++ {
+			<-respChan
+		}
+		wg.Done()
+	}()
+
+	for _, client := range apiClient.Clients {
+		for j := 0; j < apiClient.PipelineFactor; j++ {
+			go func() {
+				for msg := range msgQueue {
+					req := fasthttp.AcquireRequest()
+					req.SetBody(msg)
+					req.Header.SetMethodBytes([]byte(apiClient.Method))
+					for key, value := range apiClient.Headers {
+						req.Header.Add(key, value)
+					}
+					req.SetRequestURI(apiClient.URL)
+					res := fasthttp.AcquireResponse()
+					client.DoTimeout(req, res, apiClient.Timeout)
+					respChan <- true
+				}
+			}()
+		}
 	}
 
-	for _, msg := range msgs {
-		request, err := http.NewRequest(apiClient.Method, apiClient.URL, bytes.NewBuffer(msg))
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		request.Header = headers
-		_, err = apiClient.Client.Do(request)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-	}
-	return errs
+	wg.Wait()
+	return
 }

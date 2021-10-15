@@ -7,12 +7,12 @@ type KafkaConfig struct {
 }
 
 type APIConfig struct {
-	URL                       string
-	Method                    string
-	MaxIdleConnections        int
-	MaxIdleConnectionsPerHost int
-	RequestTimeOut            int64
-	Enabled                   bool
+	URL            string
+	Method         string
+	TimeoutInMS    int64
+	Enabled        bool
+	PipelineFactor int
+	NumClients     int
 }
 
 type Conf struct {

@@ -64,7 +64,7 @@ func createAPIClients(config APIConfig) apiClient {
 func callForABatch(apiName string, msgs [][]byte) {
 	apiClient, _ := apiClients[apiName]
 	msgQueue := make(chan []byte, 50)
-	respChan := make(chan bool, len(msgs))
+	respChan := make(chan *fasthttp.Response, len(msgs))
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -94,7 +94,7 @@ func callForABatch(apiName string, msgs [][]byte) {
 					req.SetRequestURI(apiClient.URL)
 					res := fasthttp.AcquireResponse()
 					client.DoTimeout(req, res, apiClient.Timeout)
-					respChan <- true
+					respChan <- res
 				}
 			}()
 		}

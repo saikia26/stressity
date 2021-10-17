@@ -2,7 +2,6 @@ package loadtest
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -95,9 +94,7 @@ func callForABatch(apiName string, msgs [][]byte) {
 			for msg := range msgQueue {
 				request, _ := http.NewRequest(apiClient.Method, apiClient.URL, bytes.NewBuffer(msg))
 				request.Header = headers
-				resp, err := apiClient.Client.Do(request)
-				fmt.Println(resp)
-				fmt.Println(err)
+				apiClient.Client.Do(request)
 				respChan <- http.Response{}
 			}
 		}()

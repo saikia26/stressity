@@ -9,9 +9,11 @@
   },
   "APIConfigs": {
     "test": {
-      "URL": "localhost:8080/risk/api/v2/validate/partnertxn",
+      "URL": "localhost:8080/validate",
       "Method": "POST",
-      "Enabled": true
+      "Enabled": true,
+      "NumClients": 10,
+      "TimeoutInMS": 20000
     }
   }
 }

@@ -11,8 +11,9 @@ type APIConfig struct {
 	Method                    string
 	MaxIdleConnections        int
 	MaxIdleConnectionsPerHost int
-	RequestTimeOut            int64
+	TimeoutInMS               int64
 	Enabled                   bool
+	NumClients                int
 }
 
 type Conf struct {

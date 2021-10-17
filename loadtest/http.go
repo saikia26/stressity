@@ -2,7 +2,9 @@ package loadtest
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -12,10 +14,11 @@ const (
 )
 
 type APIClient struct {
-	Client  *http.Client
-	Method  string
-	URL     string
-	Headers map[string]string
+	Client     *http.Client
+	Method     string
+	URL        string
+	Headers    map[string]string
+	NumClients int
 }
 
 var (
@@ -42,7 +45,7 @@ func createAPIClients(config APIConfig) APIClient {
 	if maxIdleConPerHost == 0 {
 		maxIdleConPerHost = 30
 	}
-	timeoutInMs := config.RequestTimeOut
+	timeoutInMs := config.TimeoutInMS
 	if timeoutInMs == 0 {
 		timeoutInMs = 2000
 	}
@@ -59,28 +62,46 @@ func createAPIClients(config APIConfig) APIClient {
 		Headers: map[string]string{
 			contentType: applicationJSON,
 		},
+		NumClients: config.NumClients,
 	}
 }
 
-func callForABatch(apiName string, msgs [][]byte) (errs []error) {
+func callForABatch(apiName string, msgs [][]byte) {
 	apiClient, _ := apiClients[apiName]
 	headers := http.Header{}
 	for key, value := range apiClient.Headers {
 		headers.Set(key, value)
 	}
+	msgQueue := make(chan []byte, 50)
+	respChan := make(chan http.Response, len(msgs))
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 
-	for _, msg := range msgs {
-		request, err := http.NewRequest(apiClient.Method, apiClient.URL, bytes.NewBuffer(msg))
-		if err != nil {
-			errs = append(errs, err)
-			continue
+	go func() {
+		for _, msg := range msgs {
+			msgQueue <- msg
 		}
-		request.Header = headers
-		_, err = apiClient.Client.Do(request)
-		if err != nil {
-			errs = append(errs, err)
-			continue
+	}()
+
+	go func() {
+		for i := 0; i < len(msgs); i++ {
+			<-respChan
 		}
+		wg.Done()
+	}()
+
+	for i := 0; i < apiClient.NumClients; i++ {
+		go func() {
+			for msg := range msgQueue {
+				request, _ := http.NewRequest(apiClient.Method, apiClient.URL, bytes.NewBuffer(msg))
+				request.Header = headers
+				resp, err := apiClient.Client.Do(request)
+				fmt.Println(resp)
+				fmt.Println(err)
+				respChan <- http.Response{}
+			}
+		}()
 	}
-	return errs
+
+	wg.Wait()
 }

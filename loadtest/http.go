@@ -39,13 +39,12 @@ func InitHTTPClients() {
 func createAPIClients(config APIConfig) apiClient {
 	var clients []fasthttp.PipelineClient
 	u, _ := url.Parse(config.URL)
-	client := fasthttp.PipelineClient{
-		Addr:               u.Host,
-		IsTLS:              u.Scheme == "https",
-		MaxPendingRequests: config.PipelineFactor,
-	}
-
 	for i := 0; i < config.NumClients; i++ {
+		client := fasthttp.PipelineClient{
+			Addr:               u.Host,
+			IsTLS:              u.Scheme == "https",
+			MaxPendingRequests: config.PipelineFactor,
+		}
 		clients = append(clients, client)
 	}
 	headers := map[string]string{

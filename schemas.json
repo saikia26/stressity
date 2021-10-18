@@ -1,59 +1,51 @@
 {
-  "testStream": {
-    "StreamName": "test_stream",
+  "test": {
     "Enabled": true,
     "BatchSize": 10,
     "BatchIntervalInMS": 100,
     "RunDurationInSec": 30,
     "TotalCount": 20,
-    "Schema": {
+    "TestStream": true,
+    "TestAPI": true,
+    "StreamSchema": {
       "objectKey": {
         "type": "object",
         "objectMap": {
-          "key1": {
-            "type": "string",
-            "meta": {
-              "prefix": "abc",
-              "suffix": "xyz",
-              "base": "random:10"
-            }
-          },
-          "key2": {
-            "type": "string",
-            "meta": {
-              "prefix": "abc",
-              "suffix": "xyz",
-              "base": "uuid"
-            }
-          },
-          "key3": {
-            "type": "string",
-            "meta": {
-              "prefix": "abc",
-              "suffix": "xyz",
-              "base": "someString"
-            }
-          },
-          "key4": {
-            "type": "number",
-            "meta": {
-              "min": 100,
-              "max": 10000
-            }
-          },
-          "key5": {
-            "type": "integer",
-            "meta": {
-              "min": 100,
-              "max": 10000
-            }
-          },
-          "key6": {
-            "type": "time",
-            "meta": {}
-          }
+          "key1": {},
+          "key2": {},
+          "key3": {},
+          "key4": {},
+          "key5": {},
+          "key6": {}
         }
       },
+      "key7": {},
+      "key8": {},
+      "key9": {},
+      "key10": {},
+      "key11": {},
+      "key12": {}
+    },
+    "APISchema": {
+      "objectKey": {
+        "type": "object",
+        "objectMap": {
+          "key1": {},
+          "key2": {},
+          "key3": {},
+          "key4": {},
+          "key5": {},
+          "key6": {}
+        }
+      },
+      "key7": {},
+      "key8": {},
+      "key9": {},
+      "key10": {},
+      "key11": {},
+      "key12": {}
+    },
+    "KeyMeta": {
       "key1": {
         "type": "string",
         "meta": {
@@ -95,65 +87,8 @@
       "key6": {
         "type": "time",
         "meta": {}
-      }
-    }
-  },
-  "testStream2": {
-    "StreamName": "test_stream",
-    "Enabled": true,
-    "BatchSize": 10,
-    "BatchIntervalInMS": 1000,
-    "RunDurationInSec": 30,
-    "TotalCount": 100,
-    "Schema": {
-      "objectKey": {
-        "type": "object",
-        "objectMap": {
-          "key1": {
-            "type": "string",
-            "meta": {
-              "prefix": "abc",
-              "suffix": "xyz",
-              "base": "random:10"
-            }
-          },
-          "key2": {
-            "type": "string",
-            "meta": {
-              "prefix": "abc",
-              "suffix": "xyz",
-              "base": "uuid"
-            }
-          },
-          "key3": {
-            "type": "string",
-            "meta": {
-              "prefix": "abc",
-              "suffix": "xyz",
-              "base": "someString"
-            }
-          },
-          "key4": {
-            "type": "number",
-            "meta": {
-              "min": 100,
-              "max": 10000
-            }
-          },
-          "key5": {
-            "type": "integer",
-            "meta": {
-              "min": 100,
-              "max": 10000
-            }
-          },
-          "key6": {
-            "type": "time",
-            "meta": {}
-          }
-        }
       },
-      "key1": {
+      "key7": {
         "type": "string",
         "meta": {
           "prefix": "abc",
@@ -161,7 +96,7 @@
           "base": "random:10"
         }
       },
-      "key2": {
+      "key8": {
         "type": "string",
         "meta": {
           "prefix": "abc",
@@ -169,7 +104,7 @@
           "base": "uuid"
         }
       },
-      "key3": {
+      "key9": {
         "type": "string",
         "meta": {
           "prefix": "abc",
@@ -177,21 +112,21 @@
           "base": "someString"
         }
       },
-      "key4": {
+      "key10": {
         "type": "number",
         "meta": {
           "min": 100,
           "max": 10000
         }
       },
-      "key5": {
+      "key11": {
         "type": "integer",
         "meta": {
           "min": 100,
           "max": 10000
         }
       },
-      "key6": {
+      "key12": {
         "type": "time",
         "meta": {}
       }

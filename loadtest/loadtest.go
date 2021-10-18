@@ -3,49 +3,55 @@ package loadtest
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Shopify/sarama"
 	"sync"
 	"time"
+
+	"github.com/Shopify/sarama"
 )
 
 const (
-	keyType      = "type"
-	keyRawVal    = "rawVal"
-	keyMeta      = "meta"
-	keyObject    = "object"
-	keyObjectMap = "objectMap"
+	keyType        = "type"
+	keyLen         = "len"
+	keyRawVal      = "rawVal"
+	keyMeta        = "meta"
+	keyObject      = "object"
+	keyArray       = "array"
+	keyObjectMap   = "objectMap"
+	keyArrayValues = "arrayValues"
 )
 
-type StreamSchema struct {
-	StreamName        string
+type Schema struct {
 	Enabled           bool
 	BatchSize         int
 	BatchIntervalInMS int64
 	RunDurationInSec  int64
 	TotalCount        int
-	Schema            map[string]interface{}
+	TestAPI           bool
+	TestStream        bool
+	APISchema         map[string]interface{}
+	StreamSchema      map[string]interface{}
+	KeyMeta           map[string]interface{}
 }
 
 var (
 	AppConfig Conf
-	Schemas   map[string]StreamSchema
+	Schemas   map[string]Schema
 )
 
 func StartLoadTest() {
 	wg := &sync.WaitGroup{}
-	for schemaName, schemaConf := range Schemas {
+	for identifier, schemaConf := range Schemas {
 		if !schemaConf.Enabled {
 			continue
 		}
 		wg.Add(1)
-		go loadTestSchema(schemaName, schemaConf, wg)
+		go loadTest(identifier, schemaConf, wg)
 	}
-
 	wg.Wait()
 	fmt.Printf("\n\nDone!\n\n")
 }
 
-func loadTestSchema(schemaName string, schemaConf StreamSchema, wg *sync.WaitGroup) {
+func loadTest(schemaName string, schemaConf Schema, wg *sync.WaitGroup) {
 	startTime := time.Now()
 	currCount := 0
 	batchCount := 0
@@ -63,13 +69,16 @@ func loadTestSchema(schemaName string, schemaConf StreamSchema, wg *sync.WaitGro
 		batchCount++
 		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", schemaName, batchCount, currCount)
 		nextBatchSize := getNextBatchSize(currCount, maxCount, batchSize)
-		producerMsgs := getNextDataBatch(nextBatchSize, schemaName, schemaConf.Schema, AppConfig.KafkaConfigs[schemaConf.StreamName].Topic)
-		err := publish(schemaConf.StreamName, producerMsgs)
-		if err != nil {
-			fmt.Printf("\nError while publishing batch %d of %s, err: %v, retying...", batchCount, schemaName, err)
-		} else {
-			currCount += len(producerMsgs)
+		sampleData := generateDataFromKeyMeta(schemaConf.KeyMeta, nextBatchSize)
+		if schemaConf.TestAPI {
+			msgs := getNextDataBatchForAPI(schemaName, schemaConf.APISchema, sampleData)
+			callForABatch(schemaName, msgs)
 		}
+		if schemaConf.TestStream {
+			msgs := getNextDataBatchForStream(schemaName, schemaConf.APISchema, sampleData)
+			publishForABatch(schemaName, msgs)
+		}
+		currCount += nextBatchSize
 		time.Sleep(sleepDuration)
 	}
 }
@@ -82,36 +91,79 @@ func getNextBatchSize(countDone, maxCount, batchSize int) int {
 	return currBatchSize
 }
 
-func getNextDataBatch(batchSize int, schemaName string, schema map[string]interface{}, topic string) []*sarama.ProducerMessage {
-	msgsToPublish := make([]*sarama.ProducerMessage, 0, batchSize)
-	for count := 0; count < batchSize; count++ {
-		data := getDataFromSchema(schema)
-		msg, err := json.Marshal(data)
+func getNextDataBatchForStream(schemaName string, schema map[string]interface{}, sampleData []map[string]interface{}) []*sarama.ProducerMessage {
+	streamMsgs := make([]*sarama.ProducerMessage, 0, len(sampleData))
+	topic := AppConfig.KafkaConfigs[schemaName].Topic
+
+	for count := 0; count < len(sampleData); count++ {
+		streamData := getDataFromSchema(schema, sampleData[count])
+		streamMsg, err := json.Marshal(streamData)
 		if err != nil {
 			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
 			continue
 		}
-		msgsToPublish = append(msgsToPublish, &sarama.ProducerMessage{
+		streamMsgs = append(streamMsgs, &sarama.ProducerMessage{
 			Topic: topic,
-			Value: sarama.StringEncoder(msg),
+			Value: sarama.StringEncoder(streamMsg),
 		})
 	}
-	return msgsToPublish
+	return streamMsgs
 }
 
-func getDataFromSchema(schema map[string]interface{}) map[string]interface{} {
+func getNextDataBatchForAPI(schemaName string, schema map[string]interface{}, sampleData []map[string]interface{}) [][]byte {
+	apiMsgs := make([][]byte, 0, len(sampleData))
+	for count := 0; count < len(sampleData); count++ {
+		apiData := getDataFromSchema(schema, sampleData[count])
+		apiMsg, err := json.Marshal(apiData)
+		if err != nil {
+			fmt.Printf("\nError while unmarshaling data for %s, err: %v", schemaName, err)
+			continue
+		}
+		apiMsgs = append(apiMsgs, apiMsg)
+	}
+	return apiMsgs
+}
+
+func generateDataFromKeyMeta(keysInfo map[string]interface{}, batchSize int) []map[string]interface{} {
+	res := make([]map[string]interface{}, 0, batchSize)
+	for count := 0; count < batchSize; count++ {
+		sampleData := make(map[string]interface{})
+		for key, valObj := range keysInfo {
+			valMap, _ := valObj.(map[string]interface{})
+			if rawVal, ok := valMap[keyRawVal]; ok {
+				sampleData[key] = rawVal
+				continue
+			}
+			sampleData[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+		}
+		res = append(res, sampleData)
+	}
+	return res
+}
+
+func getDataFromSchema(schema map[string]interface{}, sampleData map[string]interface{}) map[string]interface{} {
 	res := make(map[string]interface{})
 	for key, valObj := range schema {
 		valMap, _ := valObj.(map[string]interface{})
-		if rawVal, ok := valMap[keyRawVal]; ok {
-			res[key] = rawVal
-			continue
+		typ, ok := valMap[keyType]
+		if ok {
+			if typ == keyObject {
+				res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}), sampleData)
+				continue
+			}
+			if typ == keyArray {
+				// hacky way to convert float to int
+				arrLen := valMap[keyLen].(float64)
+				arr := make([]interface{}, 0, int(arrLen))
+				arrSchema := valMap[keyArrayValues].(map[string]interface{})
+				for i := 0; i < int(arrLen); i++ {
+					arr = append(arr, getDataFromSchema(arrSchema[keyObjectMap].(map[string]interface{}), sampleData))
+				}
+				res[key] = arr
+				continue
+			}
 		}
-		if valMap[keyType] == keyObject {
-			res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}))
-			continue
-		}
-		res[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+		res[key] = sampleData[key]
 	}
 	return res
 }

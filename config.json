@@ -1,10 +1,20 @@
 {
   "KafkaConfigs": {
-    "test_stream": {
+    "test": {
       "Topic": "test_stream",
       "Brokers": ["localhost:9092"],
       "ClientID": "test",
-      "Enabled": true
+      "Enabled": false
+    }
+  },
+  "APIConfigs": {
+    "test": {
+      "URL": "localhost:8080/validate",
+      "Method": "POST",
+      "Enabled": true,
+      "PipelineFactor": 2,
+      "TimeoutInMS": 2000,
+      "NumClients": 10
     }
   }
 }

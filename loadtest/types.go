@@ -16,6 +16,7 @@ const (
 	suffixKey       = "suffix"
 	minKey          = "min"
 	maxKey          = "max"
+	arrayValKey     = "val"
 	customFormatKey = "customFormat"
 	customValKey    = "customVal"
 	outputFormatKey = "outputFormat"
@@ -30,11 +31,12 @@ const (
 
 var (
 	valueFinders = map[string]func(meta map[string]interface{}) interface{}{
-		"string":  getStringVal,
-		"uuid":    getUUID,
-		"number":  getNumber,
-		"integer": getInteger,
-		"time":    getTime,
+		"string":             getStringVal,
+		"uuid":               getUUID,
+		"number":             getNumber,
+		"integer":            getInteger,
+		"time":               getTime,
+		"getRandomFromArray": getRandomFromArray,
 	}
 )
 
@@ -122,4 +124,10 @@ func getTime(meta map[string]interface{}) interface{} {
 		return output
 	}
 	return resTime
+}
+
+func getRandomFromArray(meta map[string]interface{}) interface{} {
+	val := meta[arrayValKey].([]interface{})
+	randomIndex := rand.Intn(len(val))
+	return val[randomIndex]
 }

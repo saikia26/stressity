@@ -2,8 +2,9 @@ package loadtest
 
 import (
 	"errors"
-	"github.com/Shopify/sarama"
 	"strings"
+
+	"github.com/Shopify/sarama"
 )
 
 var (
@@ -43,6 +44,6 @@ func stopAllProducers() {
 	}
 }
 
-func publish(streamName string, msgs []*sarama.ProducerMessage) error {
+func publishForABatch(streamName string, msgs []*sarama.ProducerMessage) error {
 	return producers[streamName].SendMessages(msgs)
 }

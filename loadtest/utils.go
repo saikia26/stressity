@@ -17,61 +17,65 @@ func DecodeFile(filePath string, destination interface{}) error {
 	return decoder.Decode(destination)
 }
 
-func ValidatePreRequisites(schemas map[string]Schema) error {
-	schemasToRun := 0
-	for identifier, schemaConf := range schemas {
-		if !schemaConf.Enabled {
+func ValidatePreRequisites(features map[string]FeatureConf) error {
+	featuresToRun := 0
+	for identifier, featureConf := range features {
+		if !featureConf.Enabled {
 			continue
 		}
-		err := validateConfigsForSchema(identifier, schemaConf)
+		err := validateSchemaForFeature(identifier, featureConf)
 		if err != nil {
 			return err
 		}
-		schemasToRun++
+		featuresToRun++
 	}
-	if schemasToRun == 0 {
-		return errors.New("no schemas present")
+	if featuresToRun == 0 {
+		return errors.New("no features present")
 	}
 	return nil
 }
 
-func validateConfigsForSchema(schemaName string, schemaConf Schema) error {
-	_, ok := AppConfig.KafkaConfigs[schemaName]
-	if schemaConf.TestStream {
-		if !ok {
-			return fmt.Errorf("kafka config is either not present for %s", schemaName)
+func validateSchemaForFeature(featureName string, featureConf FeatureConf) error {
+	for schemaName, schemaAttributes := range featureConf.StreamSchema {
+		if !schemaAttributes.Enabled {
+			continue
 		}
-		err := validateSchema(schemaName, schemaConf.StreamSchema, schemaConf.KeyMeta)
+		_, ok := AppConfig.KafkaConfigs[schemaName]
+		if !ok {
+			return fmt.Errorf("kafka config is not present for schema %s in feature config for %s", schemaName, featureName)
+		}
+		err := validateSchema(featureName, schemaName, schemaAttributes.Definition, featureConf.KeyMeta)
 		if err != nil {
 			return err
 		}
 	}
-
-	_, ok = AppConfig.APIConfigs[schemaName]
-	if schemaConf.TestAPI {
-		if !ok {
-			return fmt.Errorf("api config is either not present for %s", schemaName)
+	for schemaName, schemaAttributes := range featureConf.APISchema {
+		if !schemaAttributes.Enabled {
+			continue
 		}
-		err := validateSchema(schemaName, schemaConf.APISchema, schemaConf.KeyMeta)
+		_, ok := AppConfig.APIConfigs[schemaName]
+		if !ok {
+			return fmt.Errorf("api config is not present for schema %s in feature config for %s", schemaName, featureName)
+		}
+		err := validateSchema(featureName, schemaName, schemaAttributes.Definition, featureConf.KeyMeta)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func validateSchema(schemaName string, schema map[string]interface{}, metaObj map[string]interface{}) error {
+func validateSchema(featureName string, schemaName string, schema map[string]interface{}, metaObj map[string]interface{}) error {
 	for key, valObj := range schema {
 		valMap, ok := valObj.(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("non-map value found for key %s in schema %s", key, schemaName)
+			return fmt.Errorf("non-map value found for key %s in schema %s for feature %s", key, schemaName, featureName)
 		}
 
 		objectTyp, ok := valMap[keyType]
 		if ok {
 			if objectTyp.(string) == keyObject {
-				err := validateObjectMap(valMap, schemaName, metaObj, key)
+				err := validateObjectMap(valMap, featureName, schemaName, metaObj, key)
 				if err != nil {
 					return err
 				}
@@ -79,7 +83,7 @@ func validateSchema(schemaName string, schema map[string]interface{}, metaObj ma
 			}
 
 			if objectTyp.(string) == keyArray {
-				err := validateArray(valMap, schemaName, metaObj, key)
+				err := validateArray(valMap, featureName, schemaName, metaObj, key)
 				if err != nil {
 					return err
 				}
@@ -89,62 +93,62 @@ func validateSchema(schemaName string, schema map[string]interface{}, metaObj ma
 
 		metaMap, ok := metaObj[key].(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("meta not found for key %s in schema %s", key, schemaName)
+			return fmt.Errorf("meta not found for key %s in schema %s for feature %s", key, schemaName, featureName)
 		}
 		if _, ok := metaMap[keyRawVal]; ok {
 			continue
 		}
 		keyTyp, ok := metaMap[keyType]
 		if !ok {
-			return fmt.Errorf("type not found for key %s in key meta for schema %s", key, schemaName)
+			return fmt.Errorf("type not found for key %s in key meta for schema %s for feature %s", key, schemaName, featureName)
 		}
 		if _, ok := valueFinders[keyTyp.(string)]; !ok {
-			return fmt.Errorf("typ %s not supported (key %s in schema %s)", objectTyp, key, schemaName)
+			return fmt.Errorf("typ %s not supported (key %s in schema %s for feature %s)", objectTyp, key, schemaName, featureName)
 		}
 		if keyTyp.(string) == "uuid" || keyTyp.(string) == "time" {
 			continue
 		}
 		meta, ok := metaMap[keyMeta]
 		if !ok {
-			return fmt.Errorf("meta not found for key %s in key meta for schema %s", key, schemaName)
+			return fmt.Errorf("meta not found for key %s in key meta for schema %s for feature %s", key, schemaName, featureName)
 		}
 		if _, ok := meta.(map[string]interface{}); !ok {
-			return fmt.Errorf("meta not a map for key %s in schema %s", key, schemaName)
+			return fmt.Errorf("meta not a map for key %s in schema %s for feature %s", key, schemaName, featureName)
 		}
 	}
 	return nil
 }
 
 // validateArray currently supports and validates an array of key value pairs only.
-func validateArray(valMap map[string]interface{}, schemaName string, metaObj map[string]interface{}, key string) error {
+func validateArray(valMap map[string]interface{}, featureName, schemaName string, metaObj map[string]interface{}, key string) error {
 	arr, ok := valMap[keyArrayValues]
 	if !ok {
-		return fmt.Errorf("no array schema found for key %s in schema %s", key, schemaName)
+		return fmt.Errorf("no array schema found for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
 	_, ok = valMap[keyLen]
 	if !ok {
-		return fmt.Errorf("array length not specified for key %s in schema %s", key, schemaName)
+		return fmt.Errorf("array length not specified for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
 	arrVals, ok := arr.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("non-map object found for key %s in schema %s", key, schemaName)
+		return fmt.Errorf("non-map object found for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
 
-	return validateObjectMap(arrVals, schemaName, metaObj, key)
+	return validateObjectMap(arrVals, featureName, schemaName, metaObj, key)
 }
 
-func validateObjectMap(valMap map[string]interface{}, schemaName string, metaObj map[string]interface{}, key string) error {
+func validateObjectMap(valMap map[string]interface{}, featureName, schemaName string, metaObj map[string]interface{}, key string) error {
 	objectMap, ok := valMap[keyObjectMap]
 	if !ok {
-		return fmt.Errorf("no object map found for key %s in schema %s", key, schemaName)
+		return fmt.Errorf("no object map found for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
 
 	objectMapVal, ok := objectMap.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("non-map object found for object type key %s in schema %s", key, schemaName)
+		return fmt.Errorf("non-map object found for object type key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
 
-	return validateSchema(schemaName, objectMapVal, metaObj)
+	return validateSchema(featureName, schemaName, objectMapVal, metaObj)
 }
 
 func getRandomString(n int) string {

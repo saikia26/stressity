@@ -12,7 +12,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = loadtest.DecodeFile(schemaFilePath, &loadtest.Schemas)
+	err = loadtest.DecodeFile(schemaFilePath, &loadtest.Features)
 	if err != nil {
 		panic(err)
 	}
@@ -22,7 +22,7 @@ func main() {
 		panic(err)
 	}
 	loadtest.InitHTTPClients()
-	err = loadtest.ValidatePreRequisites(loadtest.Schemas)
+	err = loadtest.ValidatePreRequisites(loadtest.Features)
 	if err != nil {
 		panic(err)
 	}

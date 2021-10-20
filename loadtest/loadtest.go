@@ -20,63 +20,56 @@ const (
 	keyArrayValues = "arrayValues"
 )
 
-type Schema struct {
-	Enabled           bool
-	BatchSize         int
-	BatchIntervalInMS int64
-	RunDurationInSec  int64
-	TotalCount        int
-	TestAPI           bool
-	TestStream        bool
-	APISchema         map[string]interface{}
-	StreamSchema      map[string]interface{}
-	KeyMeta           map[string]interface{}
-}
-
 var (
-	AppConfig Conf
-	Schemas   map[string]Schema
+	AppConfig AppConf
+	Features  map[string]FeatureConf
 )
 
 func StartLoadTest() {
 	wg := &sync.WaitGroup{}
-	for identifier, schemaConf := range Schemas {
-		if !schemaConf.Enabled {
+	for identifier, featureConf := range Features {
+		if !featureConf.Enabled {
 			continue
 		}
 		wg.Add(1)
-		go loadTest(identifier, schemaConf, wg)
+		go loadTest(identifier, featureConf, wg)
 	}
 	wg.Wait()
 	fmt.Printf("\n\nDone!\n\n")
 }
 
-func loadTest(schemaName string, schemaConf Schema, wg *sync.WaitGroup) {
+func loadTest(featureName string, featureConf FeatureConf, wg *sync.WaitGroup) {
 	startTime := time.Now()
 	currCount := 0
 	batchCount := 0
 	defer func() {
-		fmt.Printf("\n\nLoad test for %s completed!\nTotal count: %d\nStart time: %s\nEnd time: %s\n", schemaName, currCount, startTime.String(), time.Now().String())
+		fmt.Printf("\n\nLoad test for %s completed!\nTotal count: %d\nStart time: %s\nEnd time: %s\n", featureName, currCount, startTime.String(), time.Now().String())
 		wg.Done()
 	}()
 
-	endTime := startTime.Add(time.Duration(schemaConf.RunDurationInSec) * time.Second)
-	maxCount := schemaConf.TotalCount
-	batchSize := schemaConf.BatchSize
-	sleepDuration := time.Duration(schemaConf.BatchIntervalInMS) * time.Millisecond
+	endTime := startTime.Add(time.Duration(featureConf.RunDurationInSec) * time.Second)
+	maxCount := featureConf.TotalCount
+	batchSize := featureConf.BatchSize
+	sleepDuration := time.Duration(featureConf.BatchIntervalInMS) * time.Millisecond
 
 	for currCount < maxCount && time.Now().Before(endTime) {
 		batchCount++
-		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", schemaName, batchCount, currCount)
+		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", featureName, batchCount, currCount)
 		nextBatchSize := getNextBatchSize(currCount, maxCount, batchSize)
-		sampleData := generateDataFromKeyMeta(schemaConf.KeyMeta, nextBatchSize)
-		if schemaConf.TestAPI {
-			msgs := getNextDataBatchForAPI(schemaName, schemaConf.APISchema, sampleData)
-			callForABatch(schemaName, msgs)
+		sampleData := generateDataFromKeyMeta(featureConf.KeyMeta, nextBatchSize)
+		for schemaName, schemaAttributes := range featureConf.APISchema {
+			if !schemaAttributes.Enabled {
+				continue
+			}
+			msgs := getNextDataBatchForAPI(schemaName, schemaAttributes.Definition, sampleData)
+			go callForABatch(schemaName, msgs)
 		}
-		if schemaConf.TestStream {
-			msgs := getNextDataBatchForStream(schemaName, schemaConf.APISchema, sampleData)
-			publishForABatch(schemaName, msgs)
+		for schemaName, schemaAttributes := range featureConf.StreamSchema {
+			if !schemaAttributes.Enabled {
+				continue
+			}
+			msgs := getNextDataBatchForStream(schemaName, schemaAttributes.Definition, sampleData)
+			go publishForABatch(schemaName, msgs)
 		}
 		currCount += nextBatchSize
 		time.Sleep(sleepDuration)

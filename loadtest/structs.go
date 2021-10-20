@@ -12,11 +12,27 @@ type APIConfig struct {
 	MaxIdleConnections        int
 	MaxIdleConnectionsPerHost int
 	TimeoutInMS               int64
-	Enabled                   bool
 	NumClients                int
+	Enabled                   bool
 }
 
-type Conf struct {
+type AppConf struct {
 	KafkaConfigs map[string]KafkaConfig
 	APIConfigs   map[string]APIConfig
+}
+
+type FeatureConf struct {
+	Enabled           bool
+	BatchSize         int
+	BatchIntervalInMS int64
+	RunDurationInSec  int64
+	TotalCount        int
+	APISchema         map[string]SchemaAttributes
+	StreamSchema      map[string]SchemaAttributes
+	KeyMeta           map[string]interface{}
+}
+
+type SchemaAttributes struct {
+	Enabled    bool
+	Definition map[string]interface{}
 }

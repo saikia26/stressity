@@ -10,14 +10,15 @@ import (
 )
 
 const (
-	keyType        = "type"
-	keyLen         = "len"
-	keyRawVal      = "rawVal"
-	keyMeta        = "meta"
-	keyObject      = "object"
-	keyArray       = "array"
-	keyObjectMap   = "objectMap"
-	keyArrayValues = "arrayValues"
+	Type        = "type"
+	Len         = "len"
+	RawVal      = "rawVal"
+	Meta        = "meta"
+	Object      = "object"
+	Array       = "array"
+	ObjectMap   = "objectMap"
+	ArrayValues = "arrayValues"
+	MetaKey     = "metaKey"
 )
 
 var (
@@ -62,14 +63,14 @@ func loadTest(featureName string, featureConf FeatureConf, wg *sync.WaitGroup) {
 				continue
 			}
 			msgs := getNextDataBatchForAPI(schemaName, schemaAttributes.Definition, sampleData)
-			go callForABatch(schemaName, msgs)
+			callForABatch(schemaName, msgs)
 		}
 		for schemaName, schemaAttributes := range featureConf.StreamSchema {
 			if !schemaAttributes.Enabled {
 				continue
 			}
 			msgs := getNextDataBatchForStream(schemaName, schemaAttributes.Definition, sampleData)
-			go publishForABatch(schemaName, msgs)
+			publishForABatch(schemaName, msgs)
 		}
 		currCount += nextBatchSize
 		time.Sleep(sleepDuration)
@@ -123,11 +124,11 @@ func generateDataFromKeyMeta(keysInfo map[string]interface{}, batchSize int) []m
 		sampleData := make(map[string]interface{})
 		for key, valObj := range keysInfo {
 			valMap, _ := valObj.(map[string]interface{})
-			if rawVal, ok := valMap[keyRawVal]; ok {
+			if rawVal, ok := valMap[RawVal]; ok {
 				sampleData[key] = rawVal
 				continue
 			}
-			sampleData[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+			sampleData[key] = valueFinders[valMap[Type].(string)](valMap[Meta].(map[string]interface{}))
 		}
 		res = append(res, sampleData)
 	}
@@ -138,25 +139,26 @@ func getDataFromSchema(schema map[string]interface{}, sampleData map[string]inte
 	res := make(map[string]interface{})
 	for key, valObj := range schema {
 		valMap, _ := valObj.(map[string]interface{})
-		typ, ok := valMap[keyType]
+		typ, ok := valMap[Type]
 		if ok {
-			if typ == keyObject {
-				res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}), sampleData)
+			if typ == Object {
+				res[key] = getDataFromSchema(valMap[ObjectMap].(map[string]interface{}), sampleData)
 				continue
 			}
-			if typ == keyArray {
+			if typ == Array {
 				// hacky way to convert float to int
-				arrLen := valMap[keyLen].(float64)
+				arrLen := valMap[Len].(float64)
 				arr := make([]interface{}, 0, int(arrLen))
-				arrSchema := valMap[keyArrayValues].(map[string]interface{})
+				arrSchema := valMap[ArrayValues].(map[string]interface{})
 				for i := 0; i < int(arrLen); i++ {
-					arr = append(arr, getDataFromSchema(arrSchema[keyObjectMap].(map[string]interface{}), sampleData))
+					arr = append(arr, getDataFromSchema(arrSchema[ObjectMap].(map[string]interface{}), sampleData))
 				}
 				res[key] = arr
 				continue
 			}
 		}
-		res[key] = sampleData[key]
+		metaIdentifier := fetchMetaIdentifier(valMap, key)
+		res[key] = sampleData[metaIdentifier]
 	}
 	return res
 }

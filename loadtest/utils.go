@@ -72,9 +72,9 @@ func validateSchema(featureName string, schemaName string, schema map[string]int
 			return fmt.Errorf("non-map value found for key %s in schema %s for feature %s", key, schemaName, featureName)
 		}
 
-		objectTyp, ok := valMap[keyType]
+		objectTyp, ok := valMap[Type]
 		if ok {
-			if objectTyp.(string) == keyObject {
+			if objectTyp.(string) == Object {
 				err := validateObjectMap(valMap, featureName, schemaName, metaObj, key)
 				if err != nil {
 					return err
@@ -82,7 +82,7 @@ func validateSchema(featureName string, schemaName string, schema map[string]int
 				continue
 			}
 
-			if objectTyp.(string) == keyArray {
+			if objectTyp.(string) == Array {
 				err := validateArray(valMap, featureName, schemaName, metaObj, key)
 				if err != nil {
 					return err
@@ -91,14 +91,15 @@ func validateSchema(featureName string, schemaName string, schema map[string]int
 			}
 		}
 
-		metaMap, ok := metaObj[key].(map[string]interface{})
+		metaIdentifier := fetchMetaIdentifier(valMap, key)
+		metaMap, ok := metaObj[metaIdentifier].(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("meta not found for key %s in schema %s for feature %s", key, schemaName, featureName)
 		}
-		if _, ok := metaMap[keyRawVal]; ok {
+		if _, ok := metaMap[RawVal]; ok {
 			continue
 		}
-		keyTyp, ok := metaMap[keyType]
+		keyTyp, ok := metaMap[Type]
 		if !ok {
 			return fmt.Errorf("type not found for key %s in key meta for schema %s for feature %s", key, schemaName, featureName)
 		}
@@ -108,7 +109,7 @@ func validateSchema(featureName string, schemaName string, schema map[string]int
 		if keyTyp.(string) == "uuid" || keyTyp.(string) == "time" {
 			continue
 		}
-		meta, ok := metaMap[keyMeta]
+		meta, ok := metaMap[Meta]
 		if !ok {
 			return fmt.Errorf("meta not found for key %s in key meta for schema %s for feature %s", key, schemaName, featureName)
 		}
@@ -119,13 +120,20 @@ func validateSchema(featureName string, schemaName string, schema map[string]int
 	return nil
 }
 
+func fetchMetaIdentifier(schemaObj map[string]interface{}, schemaKey string) (key string) {
+	if val, ok := schemaObj[MetaKey]; ok {
+		return val.(string)
+	}
+	return schemaKey
+}
+
 // validateArray currently supports and validates an array of key value pairs only.
 func validateArray(valMap map[string]interface{}, featureName, schemaName string, metaObj map[string]interface{}, key string) error {
-	arr, ok := valMap[keyArrayValues]
+	arr, ok := valMap[ArrayValues]
 	if !ok {
 		return fmt.Errorf("no array schema found for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
-	_, ok = valMap[keyLen]
+	_, ok = valMap[Len]
 	if !ok {
 		return fmt.Errorf("array length not specified for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}
@@ -138,7 +146,7 @@ func validateArray(valMap map[string]interface{}, featureName, schemaName string
 }
 
 func validateObjectMap(valMap map[string]interface{}, featureName, schemaName string, metaObj map[string]interface{}, key string) error {
-	objectMap, ok := valMap[keyObjectMap]
+	objectMap, ok := valMap[ObjectMap]
 	if !ok {
 		return fmt.Errorf("no object map found for key %s in schema %s for feature %s", key, schemaName, featureName)
 	}

@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	baseKey         = "base"
-	prefixKey       = "prefix"
-	suffixKey       = "suffix"
-	minKey          = "min"
-	maxKey          = "max"
-	arrayValKey     = "val"
-	customFormatKey = "customFormat"
-	customValKey    = "customVal"
-	outputFormatKey = "outputFormat"
-	outputType      = "outputType"
+	base         = "base"
+	prefix       = "prefix"
+	suffix       = "suffix"
+	min          = "min"
+	max          = "max"
+	arrayVal     = "val"
+	customFormat = "customFormat"
+	customVal    = "customVal"
+	outputFormat = "outputFormat"
+	outputType   = "outputType"
 
 	randomBaseType = "random"
 	uuidBaseType   = "uuid"
@@ -41,9 +41,9 @@ var (
 )
 
 func getStringVal(meta map[string]interface{}) interface{} {
-	prefix, _ := meta[prefixKey].(string)
-	suffix, _ := meta[suffixKey].(string)
-	base, _ := meta[baseKey].(string)
+	prefix, _ := meta[prefix].(string)
+	suffix, _ := meta[suffix].(string)
+	base, _ := meta[base].(string)
 	params := strings.Split(base, separator)
 
 	var baseVal string
@@ -70,20 +70,20 @@ func getUUID(meta map[string]interface{}) interface{} {
 }
 
 func getNumber(meta map[string]interface{}) interface{} {
-	min, _ := meta[minKey].(float64)
-	max, _ := meta[maxKey].(float64)
-	numRange := max - min
+	minVal, _ := meta[min].(float64)
+	maxVal, _ := meta[max].(float64)
+	numRange := maxVal - minVal
 	if numRange <= 0 {
 		numRange = defaultRange
 	}
-	return min + (numRange * rand.Float64())
+	return minVal + (numRange * rand.Float64())
 }
 
 func getInteger(meta map[string]interface{}) interface{} {
-	min, _ := meta[minKey].(float64)
-	max, _ := meta[maxKey].(float64)
-	minInt := int64(min)
-	maxInt := int64(max)
+	minVal, _ := meta[min].(float64)
+	maxVal, _ := meta[max].(float64)
+	minInt := int64(minVal)
+	maxInt := int64(maxVal)
 	numRange := maxInt - minInt
 	if numRange <= 0 {
 		numRange = int64(defaultRange)
@@ -92,9 +92,9 @@ func getInteger(meta map[string]interface{}) interface{} {
 }
 
 func getTime(meta map[string]interface{}) interface{} {
-	format, okFormat := meta[customFormatKey].(string)
-	customVal, okCustomVal := meta[customValKey].(string)
-	outputFormat, okOutputFormat := meta[outputFormatKey].(string)
+	format, okFormat := meta[customFormat].(string)
+	customVal, okCustomVal := meta[customVal].(string)
+	outputFormat, okOutputFormat := meta[outputFormat].(string)
 
 	resTime := time.Now()
 	if okFormat && okCustomVal {
@@ -127,7 +127,7 @@ func getTime(meta map[string]interface{}) interface{} {
 }
 
 func getRandomFromArray(meta map[string]interface{}) interface{} {
-	val := meta[arrayValKey].([]interface{})
+	val := meta[arrayVal].([]interface{})
 	randomIndex := rand.Intn(len(val))
 	return val[randomIndex]
 }

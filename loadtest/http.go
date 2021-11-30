@@ -2,6 +2,8 @@ package loadtest
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"sync"
 	"time"
@@ -72,7 +74,7 @@ func callForABatch(apiName string, msgs [][]byte) {
 		headers.Set(key, value)
 	}
 	msgQueue := make(chan []byte, 50)
-	respChan := make(chan http.Response, len(msgs))
+	respChan := make(chan bool, len(msgs))
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -80,12 +82,14 @@ func callForABatch(apiName string, msgs [][]byte) {
 		for _, msg := range msgs {
 			msgQueue <- msg
 		}
+		close(msgQueue)
 	}()
 
 	go func() {
 		for i := 0; i < len(msgs); i++ {
 			<-respChan
 		}
+		close(respChan)
 		wg.Done()
 	}()
 
@@ -94,11 +98,14 @@ func callForABatch(apiName string, msgs [][]byte) {
 			for msg := range msgQueue {
 				request, _ := http.NewRequest(apiClient.Method, apiClient.URL, bytes.NewBuffer(msg))
 				request.Header = headers
-				apiClient.Client.Do(request)
-				respChan <- http.Response{}
+				resp, err := apiClient.Client.Do(request)
+				if err == nil {
+					_, err = io.Copy(ioutil.Discard, resp.Body)
+					resp.Body.Close()
+				}
+				respChan <- true
 			}
 		}()
 	}
-
 	wg.Wait()
 }

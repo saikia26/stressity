@@ -10,72 +10,66 @@ import (
 )
 
 const (
-	keyType        = "type"
-	keyLen         = "len"
-	keyRawVal      = "rawVal"
-	keyMeta        = "meta"
-	keyObject      = "object"
-	keyArray       = "array"
-	keyObjectMap   = "objectMap"
-	keyArrayValues = "arrayValues"
+	Type        = "type"
+	Len         = "len"
+	RawVal      = "rawVal"
+	Meta        = "meta"
+	Object      = "object"
+	Array       = "array"
+	ObjectMap   = "objectMap"
+	ArrayValues = "arrayValues"
+	MetaKey     = "metaKey"
 )
 
-type Schema struct {
-	Enabled           bool
-	BatchSize         int
-	BatchIntervalInMS int64
-	RunDurationInSec  int64
-	TotalCount        int
-	TestAPI           bool
-	TestStream        bool
-	APISchema         map[string]interface{}
-	StreamSchema      map[string]interface{}
-	KeyMeta           map[string]interface{}
-}
-
 var (
-	AppConfig Conf
-	Schemas   map[string]Schema
+	AppConfig AppConf
+	Features  map[string]FeatureConf
 )
 
 func StartLoadTest() {
 	wg := &sync.WaitGroup{}
-	for identifier, schemaConf := range Schemas {
-		if !schemaConf.Enabled {
+	for identifier, featureConf := range Features {
+		if !featureConf.Enabled {
 			continue
 		}
 		wg.Add(1)
-		go loadTest(identifier, schemaConf, wg)
+		go loadTest(identifier, featureConf, wg)
 	}
 	wg.Wait()
 	fmt.Printf("\n\nDone!\n\n")
 }
 
-func loadTest(schemaName string, schemaConf Schema, wg *sync.WaitGroup) {
+func loadTest(featureName string, featureConf FeatureConf, wg *sync.WaitGroup) {
 	startTime := time.Now()
 	currCount := 0
 	batchCount := 0
 	defer func() {
-		fmt.Printf("\n\nLoad test for %s completed!\nTotal count: %d\nStart time: %s\nEnd time: %s\n", schemaName, currCount, startTime.String(), time.Now().String())
+		fmt.Printf("\n\nLoad test for %s completed!\nTotal count: %d\nStart time: %s\nEnd time: %s\n", featureName, currCount, startTime.String(), time.Now().String())
 		wg.Done()
 	}()
 
-	endTime := startTime.Add(time.Duration(schemaConf.RunDurationInSec) * time.Second)
-	maxCount := schemaConf.TotalCount
-	batchSize := schemaConf.BatchSize
-	sleepDuration := time.Duration(schemaConf.BatchIntervalInMS) * time.Millisecond
+	endTime := startTime.Add(time.Duration(featureConf.RunDurationInSec) * time.Second)
+	maxCount := featureConf.TotalCount
+	batchSize := featureConf.BatchSize
+	sleepDuration := time.Duration(featureConf.BatchIntervalInMS) * time.Millisecond
 
 	for currCount < maxCount && time.Now().Before(endTime) {
 		batchCount++
-		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", schemaName, batchCount, currCount)
+		fmt.Printf("\nProcessing %s batch %d | Total done till now - %d", featureName, batchCount, currCount)
 		nextBatchSize := getNextBatchSize(currCount, maxCount, batchSize)
-		sampleData := generateDataFromKeyMeta(schemaConf.KeyMeta, nextBatchSize)
-		if schemaConf.TestAPI {
-			msgs := getNextDataBatchForAPI(schemaName, schemaConf.APISchema, sampleData)
+		sampleData := generateDataFromKeyMeta(featureConf.KeyMeta, nextBatchSize)
+		for schemaName, schemaAttributes := range featureConf.APISchema {
+			if !schemaAttributes.Enabled {
+				continue
+			}
+			msgs := getNextDataBatchForAPI(schemaName, schemaAttributes.Definition, sampleData)
 			callForABatch(schemaName, msgs)
 		}
-		if schemaConf.TestStream {
-			msgs := getNextDataBatchForStream(schemaName, schemaConf.APISchema, sampleData)
+		for schemaName, schemaAttributes := range featureConf.StreamSchema {
+			if !schemaAttributes.Enabled {
+				continue
+			}
+			msgs := getNextDataBatchForStream(schemaName, schemaAttributes.Definition, sampleData)
 			publishForABatch(schemaName, msgs)
 		}
 		currCount += nextBatchSize
@@ -130,11 +124,11 @@ func generateDataFromKeyMeta(keysInfo map[string]interface{}, batchSize int) []m
 		sampleData := make(map[string]interface{})
 		for key, valObj := range keysInfo {
 			valMap, _ := valObj.(map[string]interface{})
-			if rawVal, ok := valMap[keyRawVal]; ok {
+			if rawVal, ok := valMap[RawVal]; ok {
 				sampleData[key] = rawVal
 				continue
 			}
-			sampleData[key] = valueFinders[valMap[keyType].(string)](valMap[keyMeta].(map[string]interface{}))
+			sampleData[key] = valueFinders[valMap[Type].(string)](valMap[Meta].(map[string]interface{}))
 		}
 		res = append(res, sampleData)
 	}
@@ -145,25 +139,26 @@ func getDataFromSchema(schema map[string]interface{}, sampleData map[string]inte
 	res := make(map[string]interface{})
 	for key, valObj := range schema {
 		valMap, _ := valObj.(map[string]interface{})
-		typ, ok := valMap[keyType]
+		typ, ok := valMap[Type]
 		if ok {
-			if typ == keyObject {
-				res[key] = getDataFromSchema(valMap[keyObjectMap].(map[string]interface{}), sampleData)
+			if typ == Object {
+				res[key] = getDataFromSchema(valMap[ObjectMap].(map[string]interface{}), sampleData)
 				continue
 			}
-			if typ == keyArray {
+			if typ == Array {
 				// hacky way to convert float to int
-				arrLen := valMap[keyLen].(float64)
+				arrLen := valMap[Len].(float64)
 				arr := make([]interface{}, 0, int(arrLen))
-				arrSchema := valMap[keyArrayValues].(map[string]interface{})
+				arrSchema := valMap[ArrayValues].(map[string]interface{})
 				for i := 0; i < int(arrLen); i++ {
-					arr = append(arr, getDataFromSchema(arrSchema[keyObjectMap].(map[string]interface{}), sampleData))
+					arr = append(arr, getDataFromSchema(arrSchema[ObjectMap].(map[string]interface{}), sampleData))
 				}
 				res[key] = arr
 				continue
 			}
 		}
-		res[key] = sampleData[key]
+		metaIdentifier := fetchMetaIdentifier(valMap, key)
+		res[key] = sampleData[metaIdentifier]
 	}
 	return res
 }

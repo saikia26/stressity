@@ -1,49 +1,57 @@
 {
-  "test": {
+  "FeatureName": {
     "Enabled": true,
     "BatchSize": 10,
     "BatchIntervalInMS": 100,
     "RunDurationInSec": 30,
     "TotalCount": 20,
-    "TestStream": true,
-    "TestAPI": true,
     "StreamSchema": {
-      "objectKey": {
-        "type": "object",
-        "objectMap": {
-          "key1": {},
-          "key2": {},
-          "key3": {},
-          "key4": {},
-          "key5": {},
-          "key6": {}
+      "StreamName": {
+        "Enabled": false,
+        "Definition": {
+          "objectKey": {
+            "type": "object",
+            "objectMap": {
+              "key1": {},
+              "key2": {},
+              "key3": {},
+              "key4": {},
+              "key5": {},
+              "key6": {}
+            }
+          },
+          "key7": {},
+          "key8": {},
+          "key9": {},
+          "key10": {},
+          "key11": {},
+          "key12": {}
         }
-      },
-      "key7": {},
-      "key8": {},
-      "key9": {},
-      "key10": {},
-      "key11": {},
-      "key12": {}
+      }
     },
     "APISchema": {
-      "objectKey": {
-        "type": "object",
-        "objectMap": {
-          "key1": {},
-          "key2": {},
-          "key3": {},
-          "key4": {},
-          "key5": {},
-          "key6": {}
+      "APIName": {
+        "Enabled": true,
+        "Definition": {
+          "objectKey": {
+            "type": "object",
+            "objectMap": {
+              "key1": {},
+              "key2": {},
+              "key3": {},
+              "key4": {},
+              "key5": {},
+              "key6": {}
+            }
+          },
+          "key7": {},
+          "key8": {},
+          "key9": {},
+          "key10": {},
+          "key11": {},
+          "key12": {}
         }
-      },
-      "key7": {},
-      "key8": {},
-      "key9": {},
-      "key10": {},
-      "key11": {},
-      "key12": {}
+      }
     },
     "KeyMeta": {
       "key1": {

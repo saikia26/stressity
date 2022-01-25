@@ -1,6 +1,6 @@
 {
   "KafkaConfigs": {
-    "test": {
+    "StreamName": {
       "Topic": "test_stream",
       "Brokers": ["localhost:9092"],
       "ClientID": "test",
@@ -8,13 +8,12 @@
     }
   },
   "APIConfigs": {
-    "test": {
+    "APIName": {
       "URL": "localhost:8080/validate",
       "Method": "POST",
       "Enabled": true,
-      "PipelineFactor": 2,
-      "TimeoutInMS": 2000,
-      "NumClients": 10
+      "NumClients": 10,
+      "TimeoutInMS": 20000
     }
   }
 }
